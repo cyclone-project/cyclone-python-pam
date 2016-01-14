@@ -32,6 +32,7 @@ class CustomTCPServer(SocketServer.TCPServer):
         SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass, bind_and_activate=True)
 
 
+# Server class
 class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):
         parsed_url = urlparse.urlparse(self.path)
@@ -87,20 +88,25 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.send_error(404, 'File Not Found: %s' % self.path)
 
 
-server = CustomTCPServer(('0.0.0.0', 0), CustomRequestHandler, main_queue=queue)
-# create main uri using random generated port
-PORT = server.server_address[1]
-host_ip = socket.gethostbyname(socket.gethostname())
-MY_URI = 'http://{0}:{1}'.format(host_ip, str(PORT))
-try:
-    # spawn the server in another thread
-    thread = threading.Thread(target=server.serve_forever)
-    thread.start()
-    print MY_URI
-except KeyboardInterrupt:
-    print '^C received, shutting down the web server'
+def start_server(pamh):
+    server = CustomTCPServer(('0.0.0.0', 0), CustomRequestHandler, main_queue=queue)
+    # create main uri using random generated port
+    global PORT
+    PORT = server.server_address[1]
+    host_ip = socket.gethostbyname(socket.gethostname())
+    global MY_URI
+    MY_URI = 'http://{0}:{1}'.format(host_ip, str(PORT))
+    try:
+        # spawn the server in another thread
+        thread = threading.Thread(target=server.serve_forever)
+        thread.start()
+    except KeyboardInterrupt:
+        print '^C received, shutting down the web server'
 
-# block it until there is something in the queue
-queue.get(True)
-server.shutdown()
-print access_token
+    # write the URL to open in the remote shell
+    pamh.conversation(pamh.message(pamh.PAM_TEXT_INFO, 'Browse to ' + MY_URI + ' to login'))
+
+    # block it until there is something in the queue
+    queue.get(True)
+    server.shutdown()
+    return access_token
