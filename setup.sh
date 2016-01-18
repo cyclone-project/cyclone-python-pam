@@ -1,9 +1,22 @@
 #!/bin/bash
+# install pip
+# installs python_pam.so in /lib/security
 apt-get install python-dev python-pip -y
 
-# copy the files to the proper place
-cd /lib/security
+# clone and install python package dependencies
+cd ~
+mkdir cyclone-pam && cd cyclone-pam
 git clone https://github.com/cyclone-project/cyclone-python-pam.git .
 pip install -r requirements.pip
 
+# install python script and config
+cp lib/security/cyclone_pam.py /lib/security/cyclone_pam.py
+cp lib/security/cyclone_pam.config /lib/security/cyclone_pam.config
+
+# update ssh PAM config and reload sshd
+cp etc/pam.d/sshd /etc/pam.d/sshd
+service sshd restart
+
+# clean installation files
+cd ~ rm -rf cyclone-pam
 
