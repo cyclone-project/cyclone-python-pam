@@ -1,9 +1,2 @@
-ecdsa==0.13
-jose==1.0.0
 jwt==0.3.2
-pycrypto==2.6.1
 python-jose==0.5.5
-six==1.9.0
-vboxapi==1.0
-virtualenv==13.1.2
-wheel==0.26.0
