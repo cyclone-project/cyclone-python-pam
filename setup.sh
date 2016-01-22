@@ -1,7 +1,7 @@
 #!/bin/bash
 # install pip
 # installs python_pam.so in /lib/security
-apt-get install python-dev python-pip -y
+apt-get install python-dev python-pip libpam-python -y
 
 # clone and install python package dependencies
 cd ~
