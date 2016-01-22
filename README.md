@@ -13,6 +13,24 @@ provide a simple, fast and secure way to login into a server.
 
 ## Installation
 
+### Manual configuration
+
+In order to work properly, cyclone-pam-module fetches the hostname of the machine and uses it as a base of the URL to do 
+the callbacks to this machine.
+Make sure that the hostname matches with an accessible URL to the machine. In the future this variable will be available
+from the SlipStream ENV variables configuration.
+
+You can setup your custom hostname in the machine with `sudo hostname your-new-name`
+
+### Automatic setup script
+
+The easiest way to install the project is fetching setup.sh in your machine and execute it.
+It will clone the project, install everything and clean the unnecessary files for you.
+
+You can use the next oneliner to execute the setup script:
+
+`wget https://raw.githubusercontent.com/cyclone-project/cyclone-python-pam/master/setup.sh -v -O setup.sh && ./setup.sh; rm -rf setup.sh`
+
 The next steps are the ones that the setup script does when executed:
 
 1. Install python-dev and python-pip
