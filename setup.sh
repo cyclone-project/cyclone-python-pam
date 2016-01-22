@@ -18,8 +18,8 @@ cp etc/pam.d/sshd /etc/pam.d/sshd
 
 # update sshd configuration and restart service
 cp etc/ssh/sshd_config /etc/ssh/sshd_config
-service sshd restart
+service ssh restart
 
 # clean installation files
-cd ~ rm -rf cyclone-pam
+cd ~ && rm -rf cyclone-pam
 
