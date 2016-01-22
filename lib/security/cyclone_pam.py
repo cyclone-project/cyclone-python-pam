@@ -105,6 +105,7 @@ def start_server(pamh):
 
     # write the URL to open in the remote shell
     pamh.conversation(pamh.Message(4, 'Browse to ' + MY_URI + ' to login'))
+    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
 
     # block it until there is something in the queue
     queue.get(True)
@@ -126,7 +127,6 @@ def pam_sm_authenticate(pamh, flags, argv):
     access_token = start_server(pamh)
     # pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, str(access_token)))
     # TODO update to check with whitelist
-    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
     return pamh.PAM_SUCCESS
 
 
