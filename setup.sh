@@ -13,8 +13,11 @@ pip install -r requirements.pip
 cp lib/security/cyclone_pam.py /lib/security/cyclone_pam.py
 cp lib/security/cyclone_pam.config /lib/security/cyclone_pam.config
 
-# update ssh PAM config and reload sshd
+# update ssh PAM config
 cp etc/pam.d/sshd /etc/pam.d/sshd
+
+# update sshd configuration and restart service
+cp etc/ssh/sshd_config /etc/ssh/sshd_config
 service sshd restart
 
 # clean installation files

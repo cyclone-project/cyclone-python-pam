@@ -19,10 +19,11 @@ The next steps are the ones that the setup script does when executed:
 `apt-get install python-dev python-pip -y`
 This will install pam_python.so in `/lib/security` and the necessary python dev packages
 2. Copy python script (cyclone_pam.py) and its configuration (cyclone_pam.config) to `/lib/security`
-3. Replace sshd PAM configuration in `/etc/pam.d/sshd` with the updated version in this repository (`./etc/pam.d/sshd`)
+3. Install required pyton packages listed in `requirements.pip` 
+4. Replace sshd PAM configuration in `/etc/pam.d/sshd` with the updated version in this repository (`./etc/pam.d/sshd`)
 This replaces the default UNIX authentication for our own custom federated authentication.
 It could be improved so it falls back to usual authentication if it fails.
-4. Update sshd configuration in `/etc/ssh/sshd_config` with the updated version in this repository (`./etc/ssh/sshd_config`)and restart `service sshd restart`
+5. Update sshd configuration in `/etc/ssh/sshd_config` with the updated version in this repository (`./etc/ssh/sshd_config`)and restart `service sshd restart`
 **Needed configuration changes**:
     * UsePrivilegeSeparation yes : make sure the user doesn't execute not wanted code
     * PubkeyAuthentication yes : allow login with public key
