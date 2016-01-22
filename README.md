@@ -27,9 +27,10 @@ You can setup your custom hostname in the machine with `sudo hostname your-new-n
 The easiest way to install the project is fetching setup.sh in your machine and execute it.
 It will clone the project, install everything and clean the unnecessary files for you.
 
-You can use the next oneliner to execute the setup script:
+You can use the next oneliner as superuser to execute the setup script:
 
-`wget https://raw.githubusercontent.com/cyclone-project/cyclone-python-pam/master/setup.sh -v -O setup.sh && ./setup.sh; rm -rf setup.sh`
+`wget -O - https://raw.githubusercontent.com/cyclone-project/cyclone-python-pam/master/setup.sh | bash`
+**For some reason, seems that the script needs to be run twice. It tries to execute the bash script before ending the apt-get command...** 
 
 The next steps are the ones that the setup script does when executed:
 
