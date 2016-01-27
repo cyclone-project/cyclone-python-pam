@@ -29,8 +29,7 @@ It will clone the project, install everything and clean the unnecessary files fo
 
 You can use the next oneliner as superuser to execute the setup script:
 
-`wget -O - https://raw.githubusercontent.com/cyclone-project/cyclone-python-pam/master/setup.sh | bash`
-**For some reason, seems that the script needs to be run twice. It tries to execute the bash script before ending the apt-get command...** 
+`wget -O - https://raw.githubusercontent.com/cyclone-project/cyclone-python-pam/master/setup.sh | sh`
 
 The next steps are the ones that the setup script does when executed:
 
