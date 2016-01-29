@@ -10,9 +10,10 @@ import json
 import Queue
 from jose import jwt
 
-BASE_URI = 'https://federation.cyclone-project.eu'
-SSO_URL = BASE_URI + '/auth/realms/master/protocol/openid-connect/auth?client_id={0}&redirect_uri={1}&response_type=code'
-AUTH_URL = BASE_URI + '/auth/realms/master/protocol/openid-connect/token'
+BASE_URI = 'https://federation.cyclone-project.eu/auth/realms/master/protocol/openid-connect'
+SSO_URL = BASE_URI + '/auth?client_id={0}&redirect_uri={1}&response_type=code'
+AUTH_URL = BASE_URI + '/token'
+USER_URL = BASE_URI + '/logout'
 CALLBACK_URI = '/sso_callback'
 CLIENT_ID = 'test'
 
@@ -59,16 +60,20 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             # process the info received
             response = f.read()
             json_response = json.loads(response)
-            # TODO verify the JWT token
-            global access_token
-            access_token = jwt.get_unverified_claims(str(json_response[u'access_token']))
+
+            # create return object and validate JWT
+            result = {'access_token': json_response[u'access_token'],
+                      'id_token': json_response[u'id_token'],
+                      'dec_access_token': verify_jwt(str(json_response[u'access_token'])),
+                      'dec_id_token': verify_jwt(str(json_response[u'id_token'])),
+                      'validation': True}
 
             # answer OK to the user
             self.send_response(200)
             self.end_headers()
 
             # notify main thread
-            self.server.queue.put(access_token)
+            self.server.queue.put(result)
 
         elif parsed_url.path == CALLBACK_URI:
             print 'AUTH validation callback received'
@@ -108,13 +113,24 @@ def start_server(pamh):
     pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
 
     # block it until there is something in the queue
-    queue.get(True)
+    access_token = queue.get(True)
     server.shutdown()
     return access_token
 
 
-def pam_sm_authenticate(pamh, flags, argv):
+def verify_jwt(token):
+    with open('key.pem', 'r') as keyFile:
+        key = keyFile.read()
+    return jwt.decode(token, key, audience=CLIENT_ID)
 
+
+def get_user_data(access_token):
+    user_data_request = urllib2.Request(USER_URL)
+    user_data_request.add_header('Authorization', 'Bearer ' + access_token)
+    return urllib2.urlopen(user_data_request).read()
+
+
+def pam_sm_authenticate(pamh, flags, argv):
     try:
         user = pamh.get_user(None)
     except pamh.exception, e:
@@ -122,10 +138,19 @@ def pam_sm_authenticate(pamh, flags, argv):
     if not user:
         return pamh.PAM_USER_UNKNOWN
 
-    # Start the server and get the credentials
+    # start the server and get the credentials
     pamh.conversation(pamh.Message(4, 'Starting the server'))
-    access_token = start_server(pamh)
-    # pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, str(access_token)))
+    response = start_server(pamh)
+
+    # check that the validation is positive
+    if not response['validation']:
+        return pamh.PAM_ERROR
+    else:
+        pamh.conversation(pamh.Message(4, 'User has been authenticated'))
+
+    # get the user's data
+    user_data = get_user_data(response['access_token'])
+
     # TODO update to check with whitelist
     return pamh.PAM_SUCCESS
 
