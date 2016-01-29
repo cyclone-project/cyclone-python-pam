@@ -13,6 +13,7 @@ pip install -r requirements.pip
 # install python script and config
 cp lib/security/cyclone_pam.py /lib/security/cyclone_pam.py
 cp lib/security/cyclone_pam.config /lib/security/cyclone_pam.config
+cp lib/security/key.pem /lib/security/key.pem
 
 # update ssh PAM config
 cp etc/pam.d/sshd /etc/pam.d/sshd
