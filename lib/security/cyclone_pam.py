@@ -119,7 +119,7 @@ def start_server(pamh):
 
 
 def verify_jwt(token):
-    with open('key.pem', 'r') as keyFile:
+    with open('/lib/security/key.pem', 'r') as keyFile:
         key = keyFile.read()
     return jwt.decode(token, key, audience=CLIENT_ID)
 
