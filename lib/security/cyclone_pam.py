@@ -22,11 +22,19 @@ queue = Queue.Queue()
 
 
 def generate_redirect_uri(uri):
+    """
+    Generates a full redirect URL given the port and endpoint
+    :param uri:
+    :return: string with formatted URI
+    """
     redirect_uri = '{0}{2}'.format(MY_URI, str(PORT), uri)
     return redirect_uri
 
 
 class CustomTCPServer(SocketServer.TCPServer):
+    """
+    Custom TCP server that enables reuse of address and queuing to save data
+    """
     def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True, main_queue=None):
         self.queue = main_queue
         self.allow_reuse_address = True
@@ -36,6 +44,12 @@ class CustomTCPServer(SocketServer.TCPServer):
 # Server class
 class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
     def do_GET(self):
+        """
+        Handles HTTP GET requests to the server
+        It checks for the redirect/callback URL, or the root URL
+        Otherwise returns a 404 error
+        :return: The data is returned to the main thread through the queue
+        """
         parsed_url = urlparse.urlparse(self.path)
 
         # if it's a callback to CALLBACK_URI
@@ -75,12 +89,6 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             # notify main thread
             self.server.queue.put(result)
 
-        elif parsed_url.path == CALLBACK_URI:
-            print 'AUTH validation callback received'
-            # answer OK to the user
-            self.send_response(200)
-            self.end_headers()
-
         # root url redirect to login page
         elif parsed_url.path == '/':
             print 'Redirecting to SSO login page'
@@ -94,6 +102,12 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
 
 
 def start_server(pamh):
+    """
+    Starts a server in a new thread listening in a random number
+    It waits until the server thread sends back the results before stopping it
+    :param pamh: PAM handler to write messages back to the user
+    :return: data obtained form the OIDC server
+    """
     server = CustomTCPServer(('0.0.0.0', 0), CustomRequestHandler, main_queue=queue)
     # create main uri using random generated port
     global PORT
@@ -113,24 +127,39 @@ def start_server(pamh):
     pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
 
     # block it until there is something in the queue
-    access_token = queue.get(True)
+    data = queue.get(True)
     server.shutdown()
-    return access_token
+    return data
 
 
 def verify_jwt(token):
+    """
+    Verifies that a JWT is valid with the public key
+    :param token: JWT token to verify
+    :return: decoded JWT
+    """
     with open('/lib/security/key.pem', 'r') as keyFile:
         key = keyFile.read()
     return jwt.decode(token, key, audience=CLIENT_ID)
 
 
 def get_user_data(access_token):
+    """
+    Requests the user data from the user endpoint of OIDC
+    :param access_token: authentication token to authenticate against the server
+    :return: object with user data
+    """
     user_data_request = urllib2.Request(USER_URL)
     user_data_request.add_header('Authorization', 'Bearer ' + access_token)
     return urllib2.urlopen(user_data_request).read()
 
 
 def check_whitelist (user_data):
+    """
+    Check if the specified user is in the white list of allowed users
+    :param user_data:
+    :return:
+    """
     valid = False
     with open('/lib/security/cyclone_users_list.json') as data_file:
         whitelist = json.load(data_file)
