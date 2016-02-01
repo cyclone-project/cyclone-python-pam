@@ -130,6 +130,17 @@ def get_user_data(access_token):
     return urllib2.urlopen(user_data_request).read()
 
 
+def check_whitelist (user_data):
+    valid = False
+    with open('/lib/security/cyclone_users_list.json') as data_file:
+        whitelist = json.load(data_file)
+
+    for email in whitelist['users']:
+        if email == user_data['email']:
+            valid = True
+    return valid
+
+
 def pam_sm_authenticate(pamh, flags, argv):
     try:
         user = pamh.get_user(None)
@@ -151,8 +162,11 @@ def pam_sm_authenticate(pamh, flags, argv):
     # get the user's data
     user_data = get_user_data(response['access_token'])
 
-    # TODO update to check with whitelist
-    return pamh.PAM_SUCCESS
+    # check with whitelist if user is valid
+    if check_whitelist(user_data):
+        return pamh.PAM_SUCCESS
+    else:
+        return pamh.PAM_USER_UNKNOWN
 
 
 def pam_sm_setcred(pamh, flags, argv):
