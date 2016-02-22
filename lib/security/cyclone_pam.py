@@ -162,21 +162,29 @@ def check_whitelist (user_data, user, pamh):
     :param user_data: user data fetched from the institution's user data endpoint
     :return: pamh flag
     """
+    if user == 'root':
+        path = '/root/.edugain'
+    else:
+        path = '/home/' + user + '/.edugain'
+
     try:
-        with open('/home/' + user + '/.edugain') as data_file:
+        with open(path) as data_file:
             whitelist = json.load(data_file)
     except IOError:
+        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Unknown user ' + user))
         return pamh.PAM_USER_UNKNOWN
 
-    if not hasattr(user_data, 'email'):
+    if 'email' not in user_data:
         pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Non existing mail parameter in the data provided by your institution'))
         return pamh.PAM_AUTHINFO_UNAVAIL
 
     for email in whitelist['users']:
-        if email == user_data['email']:
+        if email == str(user_data['email']):
             return pamh.PAM_SUCCESS
 
+    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Your user cannot login as' + user))
     return pamh.PAM_USER_UNKNOWN
+
 
 
 def pam_sm_authenticate(pamh, flags, argv):
