@@ -56,6 +56,7 @@ In order to determine if someone can login as a specific user we are using a whi
 In this case, CYCLONE-PAM will search for an `.edugain` file located _in the home folder of the user_ to check if a user is allowed to login.
 
 _**Example case**_
+
 1. John Doe wants to login as user 'randomuser' so he does `ssh randomuser@host`
 2. When doing SSH he logs into the given server with his EduGain account.
 3. CYCLONE-PAM fetches John Doe's mail from his EduGain account data
