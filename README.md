@@ -51,6 +51,27 @@ It could be improved so it falls back to usual authentication if it fails.
     * PermitRootLogin yes : **Enable only if you want to allow root login through ssh**
 
 
+## WhiteListing
+In order to determine if someone can login as a specific user we are using a whitelisting technique.
+In this case, CYCLONE-PAM will search for an `.edugain` file located _in the home folder of the user_ to check if a user is allowed to login.
+
+_**Example case**_
+1. John Doe wants to login as user 'randomuser' so he does `ssh randomuser@host`
+2. When doing SSH he logs into the given server with his EduGain account.
+3. CYCLONE-PAM fetches John Doe's mail from his EduGain account data
+4. CYCLONE-PAM opens the file `/home/randomuser/.edugain` and checks that the mail provided by EduGain matches with the one found in the file
+5. If at any moment the file doesn't exist or the mail is not in the file, the authentication is rejected.
+
+The structure of the `.edugain` file is as followed:
+```
+{
+  "users": [
+    "mail1@example.com",
+    "mail2@example.com"
+  ]
+}
+```
+
 
 ## References
 
