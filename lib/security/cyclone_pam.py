@@ -13,7 +13,7 @@ from jose import jwt
 BASE_URI = 'https://federation.cyclone-project.eu/auth/realms/master/protocol/openid-connect'
 SSO_URL = BASE_URI + '/auth?client_id={0}&redirect_uri={1}&response_type=code'
 AUTH_URL = BASE_URI + '/token'
-USER_URL = BASE_URI + '/logout'
+USER_URL = BASE_URI + '/userinfo'
 CALLBACK_URI = '/sso_callback'
 CLIENT_ID = 'test'
 
@@ -154,20 +154,29 @@ def get_user_data(access_token):
     return urllib2.urlopen(user_data_request).read()
 
 
-def check_whitelist (user_data):
+def check_whitelist (user_data, user, pamh):
     """
     Check if the specified user is in the white list of allowed users
-    :param user_data:
-    :return:
+    :param user: name of the user to login to
+    :param pamh: pamh handler to write back to the user
+    :param user_data: user data fetched from the institution's user data endpoint
+    :return: pamh flag
     """
-    valid = False
-    with open('/lib/security/cyclone_users_list.json') as data_file:
-        whitelist = json.load(data_file)
+    try:
+        with open('/home/' + user + '/.edugain') as data_file:
+            whitelist = json.load(data_file)
+    except IOError:
+        return pamh.PAM_USER_UNKNOWN
+
+    if not hasattr(user_data, 'email'):
+        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Non existing mail parameter in the data provided by your institution'))
+        return pamh.PAM_AUTHINFO_UNAVAIL
 
     for email in whitelist['users']:
         if email == user_data['email']:
-            valid = True
-    return valid
+            return pamh.PAM_SUCCESS
+
+    return pamh.PAM_USER_UNKNOWN
 
 
 def pam_sm_authenticate(pamh, flags, argv):
@@ -192,10 +201,7 @@ def pam_sm_authenticate(pamh, flags, argv):
     user_data = get_user_data(response['access_token'])
 
     # check with whitelist if user is valid
-    if check_whitelist(user_data):
-        return pamh.PAM_SUCCESS
-    else:
-        return pamh.PAM_USER_UNKNOWN
+    return check_whitelist(user_data, user, pamh)
 
 
 def pam_sm_setcred(pamh, flags, argv):
