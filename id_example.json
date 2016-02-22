@@ -1,0 +1,26 @@
+{
+  "session_state": "46576883-eb77-407f-94cc-4f14dd4f121e",
+  "aud": "test",
+  "iss": "https://federation.cyclone-project.eu/auth/realms/master",
+  "resource_access": {
+    "account": {
+      "roles": [
+        "manage-account",
+        "view-profile"
+      ]
+    }
+  },
+  "allowed-origins": [
+    
+  ],
+  "preferred_username": "edugain.589911e7d3cf8f5e6c736b0cac82f0421694541d",
+  "name": "",
+  "jti": "bbda7621-6fad-4a09-aa44-03fa972662a8",
+  "exp": 1453908552,
+  "azp": "test",
+  "iat": 1453908492,
+  "client_session": "866ccc82-c9d3-49fe-847e-d7499717f70c",
+  "typ": "Bearer",
+  "nbf": 0,
+  "sub": "def9ede5-3b95-4af9-8a59-9e0bd1a6148c"
+}

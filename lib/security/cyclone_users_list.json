@@ -1,0 +1,7 @@
+{
+  "options": {
+    "rootEnabled": "False",
+    "autoCreateNewUser": "False"
+  },
+  "users": ["mail1@uni1.com", "mail2@uni2.com", "mail3@uni3.com"]
+}
