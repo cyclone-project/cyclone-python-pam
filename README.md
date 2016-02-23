@@ -50,8 +50,8 @@ It could be improved so it falls back to usual authentication if it fails.
     * UsePAM yes : we need PAM enabled so it uses our PAM module
     * PermitRootLogin yes : **Enable only if you want to allow root login through ssh**
 
-
-## WhiteListing
+## Configuration
+### WhiteListing
 In order to determine if someone can login as a specific user we are using a whitelisting technique.
 In this case, CYCLONE-PAM will search for an `.edugain` file located _in the home folder of the user_ to check if a user is allowed to login.
 
@@ -73,6 +73,14 @@ The structure of the `.edugain` file is as followed:
 }
 ```
 
+### Available Ports
+As there are clouds and servers that have a limited range of ports available to be used because of a firewall, this module integrates configuration to allow
+to define which ports can the service use.
+
+To do so, edit the `/lib/security/cyclone_config` file to add your ports. 
+Add single values for specific ports and a sub array with two values from min to max for ranges.
+
+Then finally enable to load this configuration from the file changing the proper line in `/etc/pam.d/ssh` so it loads this configuration as an argument to the CYCLONE-PAM module.
 
 ## References
 
@@ -85,5 +93,6 @@ The structure of the `.edugain` file is as followed:
 
 The best way to debug the module is to send back information to the SSH using messages (see examples in the code)
 This will print the variable information into the SSH login screen.
+Also, python errors will be excepted to the auth.log file in `/var/log/auth.log`.
 
 For the server itself, it could be ran separately and tested as a usual Python script.
