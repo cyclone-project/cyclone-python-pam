@@ -2,6 +2,8 @@
 
 # Standard Un*x authentication.
 # @include common-auth
+# disable next line to configure cyclone_pam module with custom parameters
+# auth    required    pam_python.so cyclone_pam.py /lib/security/cyclone_config
 auth    required    pam_python.so cyclone_pam.py
 session optional    pam_python.so cyclone_pam.py
 

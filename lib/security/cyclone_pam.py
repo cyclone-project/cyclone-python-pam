@@ -7,6 +7,8 @@ import urlparse
 import urllib2
 import urllib
 import json
+import random
+from datetime import datetime
 import Queue
 from jose import jwt
 
@@ -101,14 +103,55 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.send_error(404, 'File Not Found: %s' % self.path)
 
 
-def start_server(pamh):
+def generate_random_port(argv):
+    """
+    Generates a random port number according to the configured available ports in
+    :return: port number (0, which means random port if no file found or some problem generating a random number)
+    """
+    config_file = argv[1]
+    # try to open the json file
+    try:
+        with open(config_file) as data_file:
+            config = json.load(data_file)
+    except IOError:
+        return 0
+
+    # check the parameter exists in the JSON file
+    if 'ports' not in config:
+        return 0
+
+    # check if there are items
+    if len(config['ports']) == 0:
+        return 0
+
+    ports = []
+    # loop through the items and generate the available ports array
+    for item in config['ports']:
+        if isinstance(item, list):
+            if (len(item) == 2) & (item[0] < item[1]):
+                ports = ports + range(item[0], item[1])
+        else:
+            ports.append(item)
+
+    # return a random item in the array
+    random.seed(datetime.now())
+    return random.choice(ports)
+
+
+def start_server(pamh, argv):
     """
     Starts a server in a new thread listening in a random number
     It waits until the server thread sends back the results before stopping it
     :param pamh: PAM handler to write messages back to the user
     :return: data obtained form the OIDC server
     """
-    server = CustomTCPServer(('0.0.0.0', 0), CustomRequestHandler, main_queue=queue)
+    port = generate_random_port(argv)
+    try:
+        server = CustomTCPServer(('0.0.0.0', port), CustomRequestHandler, main_queue=queue)
+    except socket.error:
+        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'Can\'t start browser in port ' + str(port) + '. Trying again...'))
+        return None
+
     # create main uri using random generated port
     global PORT
     PORT = server.server_address[1]
@@ -151,7 +194,8 @@ def get_user_data(access_token):
     """
     user_data_request = urllib2.Request(USER_URL)
     user_data_request.add_header('Authorization', 'Bearer ' + access_token)
-    return urllib2.urlopen(user_data_request).read()
+    response = urllib2.urlopen(user_data_request).read()
+    return json.loads(response)
 
 
 def check_whitelist (user_data, user, pamh):
@@ -186,7 +230,6 @@ def check_whitelist (user_data, user, pamh):
     return pamh.PAM_USER_UNKNOWN
 
 
-
 def pam_sm_authenticate(pamh, flags, argv):
     try:
         user = pamh.get_user(None)
@@ -196,14 +239,16 @@ def pam_sm_authenticate(pamh, flags, argv):
         return pamh.PAM_USER_UNKNOWN
 
     # start the server and get the credentials
-    pamh.conversation(pamh.Message(4, 'Starting the server'))
-    response = start_server(pamh)
+    pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'Starting the server'))
+    response = start_server(pamh, argv)
+    if response is None:
+        return pamh.PAM_ERROR
 
     # check that the validation is positive
     if not response['validation']:
         return pamh.PAM_ERROR
     else:
-        pamh.conversation(pamh.Message(4, 'User has been authenticated'))
+        pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'User has been authenticated'))
 
     # get the user's data
     user_data = get_user_data(response['access_token'])
