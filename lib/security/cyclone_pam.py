@@ -8,6 +8,7 @@ import urllib2
 import urllib
 import json
 import random
+from datetime import datetime
 import Queue
 from jose import jwt
 
@@ -133,6 +134,7 @@ def generate_random_port(argv):
             ports.append(item)
 
     # return a random item in the array
+    random.seed(datetime.now())
     return random.choice(ports)
 
 
@@ -144,7 +146,12 @@ def start_server(pamh, argv):
     :return: data obtained form the OIDC server
     """
     port = generate_random_port(argv)
-    server = CustomTCPServer(('0.0.0.0', port), CustomRequestHandler, main_queue=queue)
+    try:
+        server = CustomTCPServer(('0.0.0.0', port), CustomRequestHandler, main_queue=queue)
+    except socket.error:
+        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'Can\'t start browser in port ' + str(port) + '. Trying again...'))
+        return None
+
     # create main uri using random generated port
     global PORT
     PORT = server.server_address[1]
@@ -231,11 +238,11 @@ def pam_sm_authenticate(pamh, flags, argv):
     if not user:
         return pamh.PAM_USER_UNKNOWN
 
-    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, str(argv)))
-
     # start the server and get the credentials
     pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'Starting the server'))
     response = start_server(pamh, argv)
+    if response is None:
+        return pamh.PAM_ERROR
 
     # check that the validation is positive
     if not response['validation']:
