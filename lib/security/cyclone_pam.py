@@ -37,6 +37,7 @@ class CustomTCPServer(SocketServer.TCPServer):
     """
     Custom TCP server that enables reuse of address and queuing to save data
     """
+
     def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True, main_queue=None):
         self.queue = main_queue
         self.allow_reuse_address = True
@@ -59,7 +60,6 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.send_response(200)
             self.wfile.write("Code validated!")
             self.end_headers()
-
             print 'SSO login callback received'
             # check we have the code parameter
             code = urlparse.parse_qs(parsed_url.query)['code'][0]
@@ -84,12 +84,18 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
                       'dec_id_token': verify_jwt(str(json_response[u'id_token'])),
                       'validation': True}
 
-            # answer OK to the user
-            self.send_response(200)
-            self.end_headers()
-
             # notify main thread
             self.server.queue.put(result)
+
+            # answer OK to the user and show informative message
+            # the console messages blocks all the threads so it's a must for the user to press enter
+            # in order to make the system work
+            self.send_response(200)
+            self.send_header('Content-type', 'text/html')
+            self.end_headers()
+            self.wfile.write("<h1>Authentication Successful!</h1>")
+            self.wfile.write("Please, go back to the terminal to finish the login")
+            self.end_headers()
 
         # root url redirect to login page
         elif parsed_url.path == '/':
@@ -153,7 +159,8 @@ def start_server(pamh, argv):
     try:
         server = CustomTCPServer(('0.0.0.0', port), CustomRequestHandler, main_queue=queue)
     except socket.error:
-        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'Can\'t start browser in port ' + str(port) + '. Trying again...'))
+        pamh.conversation(
+            pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'Can\'t start browser in port ' + str(port) + '. Trying again...'))
         return None
 
     # create main uri using random generated port
@@ -202,7 +209,7 @@ def get_user_data(access_token):
     return json.loads(response)
 
 
-def check_whitelist (user_data, user, pamh):
+def check_whitelist(user_data, user, pamh):
     """
     Check if the specified user is in the white list of allowed users
     :param user: name of the user to login to
@@ -226,7 +233,8 @@ def check_whitelist (user_data, user, pamh):
         user_data['email'] = user_data['mail']
 
     if 'email' not in user_data:
-        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Non existing mail parameter in the data provided by your institution'))
+        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON,
+                                       'ERROR: Non existing mail parameter in the data provided by your institution'))
         return pamh.PAM_AUTHINFO_UNAVAIL
 
     for email in whitelist['users']:
@@ -248,20 +256,15 @@ def pam_sm_authenticate(pamh, flags, argv):
     # start the server and get the credentials
     pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'Starting the server'))
     response = start_server(pamh, argv)
-    if response is None:
-        return pamh.PAM_ERROR
 
     # check that the validation is positive
-    if not response['validation']:
+    if response is None or not response['validation']:
         return pamh.PAM_ERROR
-    else:
-        pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'User has been authenticated'))
 
-    # get the user's data
-    user_data = get_user_data(response['access_token'])
+    pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'User has been authenticated in eduGAIN network'))
 
     # check with whitelist if user is valid
-    return check_whitelist(user_data, user, pamh)
+    return check_whitelist(get_user_data(response['access_token']), user, pamh)
 
 
 def pam_sm_setcred(pamh, flags, argv):
