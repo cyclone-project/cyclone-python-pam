@@ -218,6 +218,9 @@ def check_whitelist (user_data, user, pamh):
         pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Unknown user ' + user))
         return pamh.PAM_USER_UNKNOWN
 
+    if 'email' not in user_data and 'mail' in user_data.keys():
+        user_data['email']=user_data['mail']
+
     if 'email' not in user_data:
         pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Non existing mail parameter in the data provided by your institution'))
         return pamh.PAM_AUTHINFO_UNAVAIL
