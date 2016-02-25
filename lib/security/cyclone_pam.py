@@ -108,7 +108,11 @@ def generate_random_port(argv):
     Generates a random port number according to the configured available ports in
     :return: port number (0, which means random port if no file found or some problem generating a random number)
     """
-    config_file = argv[1]
+    if len(argv) >= 2:
+        config_file = argv[1]
+    else:
+        return 0
+    
     # try to open the json file
     try:
         with open(config_file) as data_file:
@@ -219,7 +223,7 @@ def check_whitelist (user_data, user, pamh):
         return pamh.PAM_USER_UNKNOWN
 
     if 'email' not in user_data and 'mail' in user_data.keys():
-        user_data['email']=user_data['mail']
+        user_data['email'] = user_data['mail']
 
     if 'email' not in user_data:
         pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Non existing mail parameter in the data provided by your institution'))
