@@ -166,7 +166,7 @@ def start_server(pamh, argv):
     # create main uri using random generated port
     global PORT
     PORT = server.server_address[1]
-    host_ip = socket.gethostname()
+    host_ip = socket.getfqdn()
     global MY_URI
     MY_URI = 'http://{0}:{1}'.format(host_ip, str(PORT))
     try:
