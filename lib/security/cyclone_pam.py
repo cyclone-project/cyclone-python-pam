@@ -18,6 +18,7 @@ AUTH_URL = BASE_URI + '/token'
 USER_URL = BASE_URI + '/userinfo'
 CALLBACK_URI = '/sso_callback'
 CLIENT_ID = 'test'
+AUTH_HTML_TIMEOUT = 10
 
 keep_running = True
 queue = Queue.Queue()
@@ -95,6 +96,22 @@ class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
             self.end_headers()
             self.wfile.write("<h1>Authentication Successful!</h1>")
             self.wfile.write("Please, go back to the terminal to finish the login")
+            self.wfile.write("<br/>This windows will automatically close in <span id=\"t\">%i</span> secondes."
+                             % AUTH_HTML_TIMEOUT)
+            self.wfile.write("<br/><br/><small id=\"f\" style=\"visibility: hidden;\">Note that in Firefox you have to go to about:config "
+                             "(type it in the url bar) and set 'dom.allow_scripts_to_close_windows' "
+                             "to True to allow autoclosing of tab.</small>")
+            self.wfile.write("<script type=\"text/javascript\">"
+                             "var t=performance.now()+%i000;"
+                             "for(i=1;i<=%i;i++){"
+                             "setTimeout(function(){"
+                             "document.getElementById(\"t\").innerText=Math.round((t-performance.now())/1000);"
+                             "}, i*1000);}"
+                             "setTimeout(function(){"
+                             "window.open(\"\", \"_self\", \"\");window.close();"
+                             "document.getElementById(\"f\").style.visibility='visible';"
+                             "}, %i000);"
+                             "</script>" % (AUTH_HTML_TIMEOUT, AUTH_HTML_TIMEOUT, AUTH_HTML_TIMEOUT))
             self.end_headers()
 
         # root url redirect to login page
