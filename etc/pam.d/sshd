@@ -3,9 +3,9 @@
 # Standard Un*x authentication.
 # @include common-auth
 # disable next line to configure cyclone_pam module with custom parameters
-# auth    required    pam_python.so cyclone_pam.py /lib/security/cyclone_config
-auth    required    pam_python.so cyclone_pam.py
-session optional    pam_python.so cyclone_pam.py
+# auth    required    pam_python.so /usr/local/bin/cyclone_pam.py /etc/cyclone/cyclone.conf
+auth    required    pam_python.so /usr/local/bin/cyclone_pam.py
+session optional    pam_python.so /usr/local/bin/cyclone_pam.py
 
 # Disallow non-root logins when /etc/nologin exists.
 account    required     pam_nologin.so
