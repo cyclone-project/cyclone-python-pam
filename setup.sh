@@ -13,6 +13,7 @@ pip install -r requirements.pip
 
 # Install python script and config
 cp usr/local/bin/cyclone_pam.py /usr/local/bin/cyclone_pam.py
+mkdir /etc/cyclone
 cp etc/cyclone/cyclone.config /etc/cyclone/cyclone.config
 cp etc/cyclone/key.pem /etc/cyclone/key.pem
 
