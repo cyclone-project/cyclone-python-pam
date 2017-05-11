@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Title</title>
+</head>
+<body>
+    <h1>Authentication Successful!</h1>
+    Please, go back to the terminal to finish the login
+    <br/>This windows will automatically close in <span id="t">5</span> seconds.
+    <br/><br/>
+    <small id="f" style="visibility: hidden;">Note that in Firefox you have to go to about:config
+        (type it in the url bar) and set 'dom.allow_scripts_to_close_windows'
+        to True to allow autoclosing of this tab.
+    </small>
+    <script type="text/javascript">
+
+        // Change to update the timeout time
+        var secondsTimeout = 5;
+
+        var countDownDate = new Date().getTime() + secondsTimeout * 1000 + 500;
+        var x = setInterval(function() {
+
+          var now = new Date().getTime();
+
+          var distance = countDownDate - now;
+          var seconds = Math.floor((distance % (1000 * 60)) / 1000);
+
+          document.getElementById("t").innerHTML = seconds.toString();
+
+          if (distance < 0) {
+            clearInterval(x);
+            document.getElementById("t").innerHTML = '0';
+            window.close();
+            open(location, '_self').close();
+            document.getElementById("f").style.visibility='visible';
+          }
+        }, 1000);
+
+    </script>
+</body>
+</html>

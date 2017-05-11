@@ -1,0 +1,3 @@
+# (REQUIRED) Comma separated list of emails of the people that can authenticate with this user
+# using CYCLONE's federation provider
+EMAIL = erik.berdoncesbonelo@tu-berlin.de, test@example.org

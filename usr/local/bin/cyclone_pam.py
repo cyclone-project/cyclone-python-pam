@@ -1,287 +1,376 @@
 #!/usr/bin/python
-import SimpleHTTPServer
-import SocketServer
-import socket
-import threading
-import urlparse
-import urllib2
-import urllib
-import json
-import random
-from datetime import datetime
+from oic.oic import Client
+from oic.utils.authn.client import CLIENT_AUTHN_METHOD
+from oic import rndstr
+from oic.oic.message import AuthorizationResponse
+from oic.oic.message import RegistrationResponse
+from configobj import ConfigObj
+import requests
+from BaseHTTPServer import BaseHTTPRequestHandler, HTTPServer
+from urlparse import urlparse
 import Queue
-from jose import jwt
+import random
+import threading
+import socket
 
-BASE_URI = 'https://federation.cyclone-project.eu/auth/realms/master/protocol/openid-connect'
-SSO_URL = BASE_URI + '/auth?client_id={0}&redirect_uri={1}&response_type=code'
-AUTH_URL = BASE_URI + '/token'
-USER_URL = BASE_URI + '/userinfo'
-CALLBACK_URI = '/sso_callback'
-CLIENT_ID = 'test'
-AUTH_HTML_TIMEOUT = 10
+oidc_client = None
+server = None
+config = None
 
-keep_running = True
+# Default Constants
+DEFAULT_GLOBAL_CONFIG_PATH = '/etc/cyclone/cyclone.conf'
+DEFAULT_CALLBACK_PATH = 'auth/oidc'
+DEFAULT_PORTS = ['8080', '8081', '5000-6000']
+DEFAULT_AUTHENTICATION_HTML = '/etc/cyclone/authenticated.html'
+# DEBUG
+# DEFAULT_GLOBAL_CONFIG_PATH = '../../../etc/cyclone/cyclone.conf'
+
+
+class CycloneOIDC:
+    """
+    Represents an object that saves all the session data and needed functions to handle OIDC calls
+    """
+    def __init__(self, oidc_host, realm, client_id, client_secret, redirect_uri):
+        """
+        Initializes CycloneOIDC with basic configuration parameters
+        :param oidc_host: the host (including protocol) to where to connect
+        :param realm: realm being used in Keycloak
+        :param client_id: Client ID credential
+        :param client_secret: Client Secret credential
+        :param redirect_uri: local URI to where to redirect the user after authentication and post the credentials
+        """
+        # Generate config
+        self.redirect_uri = redirect_uri
+        self.client_secret = client_secret
+        self.client_id = client_id
+        self.realm = realm
+        self.oidc_host = oidc_host
+
+        # Generate some static variables
+        self.oidc_info_url = '{:s}/auth/realms/{:s}/'.format(self.oidc_host, self.realm)
+        self.state = rndstr()
+        self.nonce = rndstr()
+        self.client = Client(client_authn_method=CLIENT_AUTHN_METHOD)
+
+        # Variable where we will save the user's info and authorization status
+        self.user_info = None
+        self.authenticated = False
+        self.redirected = False
+
+    def generate_login_url(self):
+        """
+        Configures pyOIDC with exposed OIDC configuration in Keycloak and generates a login URL 
+        :return: string containing the login URL
+        """
+        # Fetch OIDC configuration
+        self.redirected = True
+
+        self.client.provider_config(self.oidc_info_url)
+
+        # Add client credentials
+        info = {
+            "client_id": self.client_id,
+            "client_secret": self.client_secret
+        }
+        client_reg = RegistrationResponse(**info)
+        self.client.store_registration_info(client_reg)
+
+        args = {
+            "client_id": self.client.client_id,
+            "response_type": "code",
+            "scope": ["openid"],
+            "nonce": self.nonce,
+            "redirect_uri": self.redirect_uri,
+            "state": self.state
+        }
+
+        auth_req = self.client.construct_AuthorizationRequest(request_args=args)
+        login_url = auth_req.request(self.client.authorization_endpoint)
+
+        return login_url
+
+    def parse_authentication_response(self, query_string):
+        """
+        Processes OIDC answer to generate an access token and fetch the user's data,
+        which is then stored in this same class
+        :param query_string: urlencoded query string recieved from the OIDC server
+        :return: returns boolean indicating the success
+        """
+
+        if not self.redirected:
+            return
+
+        # Decode the answer and validate the sessions and nonce
+        auth_response = self.client.parse_response(AuthorizationResponse,
+                                                   info=query_string,
+                                                   sformat="urlencoded")
+
+        if auth_response['state'] != self.state:
+            return False
+
+        if "id_token" in auth_response and auth_response["id_token"]["nonce"] != self.nonce:
+            return False
+
+        # Request an access token an use it to require the user's information
+        args = {
+            "code": auth_response["code"]
+        }
+
+        self.client.do_access_token_request(state=auth_response["state"],
+                                            request_args=args,
+                                            authn_method="client_secret_basic")
+
+        self.authenticated = True
+        self.user_info = self.client.do_user_info_request(state=auth_response["state"])
+
+        return True
+
+    def get_user_info(self):
+        """
+        :return: returns the user_info in case it got fetched. None otherwise
+        """
+        return self.user_info
+
+    def authenticated(self):
+        """
+        :return: returns if the user has already been authenticated or not
+        """
+        return self.authenticated
+
+
+class CycloneServer(BaseHTTPRequestHandler):
+    """
+    BaseHTTPRequestHandler implementation to create a simple and fast HTTP server to handle redirections and callbacks
+    """
+    def index(self):
+        """
+        / path of the server
+        :return: Returns redirection to the login_url of OIDC
+        """
+        global oidc_client
+        login_url = oidc_client.generate_login_url()
+        self.send_response(303)
+        self.send_header('Location', login_url)
+        self.end_headers()
+        return
+
+    def auth(self, query):
+        """
+        /auth path of the server
+        Processes the callback from the OIDC server with the validated credentials
+        :param query: code and state of the authentication
+        :return: Returns always a successful authentication answer, 
+        and sends a message to another thread asking the server to be stopped
+        """
+        successful = False
+        global oidc_client
+        if not oidc_client.authenticated:
+            successful = oidc_client.parse_authentication_response(query)
+        if successful:
+            global queue
+            queue.put(True)
+        self.send_response(200)
+        self.send_header("Content-type", "text/html")
+        self.end_headers()
+        f = open(DEFAULT_AUTHENTICATION_HTML, 'rb')
+        self.wfile.write(f.read())
+        f.close()
+
+    def do_GET(self):
+        """
+        GET entry point of the server. Redirects to the proper path
+        :return: an HTTP answer or a 404 in case of a wrong path received
+        """
+        query = urlparse(self.path)
+        if query.path == '/{:s}'.format(DEFAULT_CALLBACK_PATH):
+            self.auth(query.query)
+        elif query.path == '/':
+            self.index()
+        else:
+            self.send_response(404)
+
+
+def setup_oidc(conf, port):
+    """
+    Creates an OIDC client object based on the loaded configuration
+    :param conf: loaded configuration
+    :param port: chosen port in where to run the server
+    """
+    global oidc_client
+    oidc_client = CycloneOIDC(
+        oidc_host=conf['OIDC_HOST'],
+        realm=conf['REALM'],
+        client_id=conf['CLIENT_ID'],
+        client_secret=conf['CLIENT_SECRET'],
+        redirect_uri='http://{:s}:{:d}/{:s}'.format(conf['HOSTNAME'], port, DEFAULT_CALLBACK_PATH)
+    )
+
+
 queue = Queue.Queue()
 
 
-def generate_redirect_uri(uri):
+def run_server(port, host, pamh):
     """
-    Generates a full redirect URL given the port and endpoint
-    :param uri:
-    :return: string with formatted URI
+    Runs the server in its own thread and stops it when received the queue notification of authentication finished
+    :param port: chosen port in where to run the server
+    :param host: host in where the client user can locate this server
+    :param pamh: PAM handle from python_pam module
     """
-    redirect_uri = '{0}{2}'.format(MY_URI, str(PORT), uri)
-    return redirect_uri
-
-
-class CustomTCPServer(SocketServer.TCPServer):
-    """
-    Custom TCP server that enables reuse of address and queuing to save data
-    """
-
-    def __init__(self, server_address, RequestHandlerClass, bind_and_activate=True, main_queue=None):
-        self.queue = main_queue
-        self.allow_reuse_address = True
-        SocketServer.TCPServer.__init__(self, server_address, RequestHandlerClass, bind_and_activate=True)
-
-
-# Server class
-class CustomRequestHandler(SimpleHTTPServer.SimpleHTTPRequestHandler):
-    def do_GET(self):
-        """
-        Handles HTTP GET requests to the server
-        It checks for the redirect/callback URL, or the root URL
-        Otherwise returns a 404 error
-        :return: The data is returned to the main thread through the queue
-        """
-        parsed_url = urlparse.urlparse(self.path)
-
-        # if it's a callback to CALLBACK_URI
-        if parsed_url.path == CALLBACK_URI:
-            self.send_response(200)
-            self.wfile.write("Code validated!")
-            self.end_headers()
-            print 'SSO login callback received'
-            # check we have the code parameter
-            code = urlparse.parse_qs(parsed_url.query)['code'][0]
-
-            # do a POST call with the code to get the id
-            data = urllib.urlencode({'grant_type': 'authorization_code',
-                                     'code': code,
-                                     'redirect_uri': generate_redirect_uri(CALLBACK_URI),
-                                     'client_id': CLIENT_ID})
-            request = urllib2.Request(AUTH_URL, data)
-            request.add_header('Content-Type', 'application/x-www-form-urlencoded')
-            f = urllib2.urlopen(request)
-
-            # process the info received
-            response = f.read()
-            json_response = json.loads(response)
-
-            # create return object and validate JWT
-            result = {'access_token': json_response[u'access_token'],
-                      'id_token': json_response[u'id_token'],
-                      'dec_access_token': verify_jwt(str(json_response[u'access_token'])),
-                      'dec_id_token': verify_jwt(str(json_response[u'id_token'])),
-                      'validation': True}
-
-            # notify main thread
-            self.server.queue.put(result)
-
-            # answer OK to the user and show informative message
-            # the console messages blocks all the threads so it's a must for the user to press enter
-            # in order to make the system work
-            self.send_response(200)
-            self.send_header('Content-type', 'text/html')
-            self.end_headers()
-            self.wfile.write("<h1>Authentication Successful!</h1>")
-            self.wfile.write("Please, go back to the terminal to finish the login")
-            self.wfile.write("<br/>This windows will automatically close in <span id=\"t\">%i</span> secondes."
-                             % AUTH_HTML_TIMEOUT)
-            self.wfile.write("<br/><br/><small id=\"f\" style=\"visibility: hidden;\">Note that in Firefox you have to go to about:config "
-                             "(type it in the url bar) and set 'dom.allow_scripts_to_close_windows' "
-                             "to True to allow autoclosing of tab.</small>")
-            self.wfile.write("<script type=\"text/javascript\">"
-                             "var t=performance.now()+%i000;"
-                             "for(i=1;i<=%i;i++){"
-                             "setTimeout(function(){"
-                             "document.getElementById(\"t\").innerText=Math.round((t-performance.now())/1000);"
-                             "}, i*1000);}"
-                             "setTimeout(function(){"
-                             "window.open(\"\", \"_self\", \"\");window.close();"
-                             "document.getElementById(\"f\").style.visibility='visible';"
-                             "}, %i000);"
-                             "</script>" % (AUTH_HTML_TIMEOUT, AUTH_HTML_TIMEOUT, AUTH_HTML_TIMEOUT))
-            self.end_headers()
-
-        # root url redirect to login page
-        elif parsed_url.path == '/':
-            print 'Redirecting to SSO login page'
-            url = SSO_URL.format(CLIENT_ID, generate_redirect_uri(CALLBACK_URI))
-            self.send_response(301)
-            self.send_header('Location', url)
-            self.end_headers()
-
+    try:
+        # Create a web server and define the handler to manage the
+        # incoming request
+        if pamh is not None:
+            pamh.conversation(pamh.Message(4, 'Browse to http://{:s}:{:d}'' to login'.format(host, port)))
+            pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
         else:
-            self.send_error(404, 'File Not Found: %s' % self.path)
+            print ('Started server in http://{:s}:{:d}'.format(host, port))
 
-
-def generate_random_port(argv):
-    """
-    Generates a random port number according to the configured available ports in
-    :return: port number (0, which means random port if no file found or some problem generating a random number)
-    """
-    if len(argv) >= 2:
-        config_file = argv[1]
-    else:
-        return 0
-    
-    # try to open the json file
-    try:
-        with open(config_file) as data_file:
-            config = json.load(data_file)
-    except IOError:
-        return 0
-
-    # check the parameter exists in the JSON file
-    if 'ports' not in config:
-        return 0
-
-    # check if there are items
-    if len(config['ports']) == 0:
-        return 0
-
-    ports = []
-    # loop through the items and generate the available ports array
-    for item in config['ports']:
-        if isinstance(item, list):
-            if (len(item) == 2) & (item[0] < item[1]):
-                ports = ports + range(item[0], item[1])
-        else:
-            ports.append(item)
-
-    # return a random item in the array
-    random.seed(datetime.now())
-    return random.choice(ports)
-
-
-def start_server(pamh, argv):
-    """
-    Starts a server in a new thread listening in a random number
-    It waits until the server thread sends back the results before stopping it
-    :param pamh: PAM handler to write messages back to the user
-    :return: data obtained form the OIDC server
-    """
-    port = generate_random_port(argv)
-    try:
-        server = CustomTCPServer(('0.0.0.0', port), CustomRequestHandler, main_queue=queue)
-    except socket.error:
-        pamh.conversation(
-            pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'Can\'t start browser in port ' + str(port) + '. Trying again...'))
-        return None
-
-    # create main uri using random generated port
-    global PORT
-    PORT = server.server_address[1]
-    host_ip = socket.getfqdn()
-    global MY_URI
-    MY_URI = 'http://{0}:{1}'.format(host_ip, str(PORT))
-    try:
-        # spawn the server in another thread
+        global server
+        server = HTTPServer(('0.0.0.0', port), CycloneServer)
         thread = threading.Thread(target=server.serve_forever)
         thread.start()
+        queue.get(True)
+        server.shutdown()
     except KeyboardInterrupt:
-        print '^C received, shutting down the web server'
-
-    # write the URL to open in the remote shell
-    pamh.conversation(pamh.Message(4, 'Browse to ' + MY_URI + ' to login'))
-    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, '<Press enter to continue>'))
-
-    # block it until there is something in the queue
-    data = queue.get(True)
-    server.shutdown()
-    return data
+        server.socket.close()
 
 
-def verify_jwt(token):
+def get_local_username(pamh):
     """
-    Verifies that a JWT is valid with the public key
-    :param token: JWT token to verify
-    :return: decoded JWT
+    Returns the local user name wanting to authenticate
+    :param pamh: PAM handle from python_pam module
+    :return: local username or empty string if not found
     """
-    with open('/etc/cyclone/key.pem', 'r') as keyFile:
-        key = keyFile.read()
-    return jwt.decode(token, key, audience=CLIENT_ID)
-
-
-def get_user_data(access_token):
-    """
-    Requests the user data from the user endpoint of OIDC
-    :param access_token: authentication token to authenticate against the server
-    :return: object with user data
-    """
-    user_data_request = urllib2.Request(USER_URL)
-    user_data_request.add_header('Authorization', 'Bearer ' + access_token)
-    response = urllib2.urlopen(user_data_request).read()
-    return json.loads(response)
-
-
-def check_whitelist(user_data, user, pamh):
-    """
-    Check if the specified user is in the white list of allowed users
-    :param user: name of the user to login to
-    :param pamh: pamh handler to write back to the user
-    :param user_data: user data fetched from the institution's user data endpoint
-    :return: pamh flag
-    """
-    if user == 'root':
-        path = '/root/.edugain'
-    else:
-        path = '/home/' + user + '/.edugain'
-
     try:
-        with open(path) as data_file:
-            whitelist = json.load(data_file)
-    except IOError:
-        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Unknown user ' + user))
-        return pamh.PAM_USER_UNKNOWN
+        user = pamh.get_user(None)
+    except:
+        user = ''
 
-    if 'email' not in user_data and 'mail' in user_data.keys():
-        user_data['email'] = user_data['mail']
+    return user
 
-    if 'email' not in user_data:
-        pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON,
-                                       'ERROR: Non existing mail parameter in the data provided by your institution'))
-        return pamh.PAM_AUTHINFO_UNAVAIL
 
-    for email in whitelist['users']:
-        if email == str(user_data['email']):
-            return pamh.PAM_SUCCESS
+def generate_random_port(conf_ports):
+    """
+    Generates a random available port given the port configuration
+    :param conf_ports: configuration string containing the different possible ports
+    :return: an available port number
+    """
+    ports = []
+    for item in conf_ports:
+        items = item.split('-')
+        if len(items) == 2:
+            ports = ports + range(int(items[0]), int(items[1]))
+        elif len(items) == 1:
+            ports.append(item)
 
-    pamh.conversation(pamh.Message(pamh.PAM_PROMPT_ECHO_ON, 'ERROR: Your user cannot login as' + user))
-    return pamh.PAM_USER_UNKNOWN
+    chosen_port = random.choice(ports)
+
+    while not is_port_available(chosen_port):
+        chosen_port = random.choice(ports)
+
+    return chosen_port
+
+
+def is_port_available(port):
+    """
+    Checks if a given port is available trying to open it with a socket
+    :param port: port to test
+    :return: returns boolean with the port availability
+    """
+    s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        s.bind(("127.0.0.1", port))
+        available = True
+    except socket.error:
+        available = False
+    s.close()
+    return available
+
+
+def load_config(global_config_path):
+    """
+    Loads the configuration from a given path
+    :param global_config_path: path from where to load the configuration
+    :return: object containing all the loaded configuration
+    """
+    global config
+    config = ConfigObj(global_config_path)
+
+    if 'PORTS' not in config:
+        config['PORTS'] = DEFAULT_PORTS
+
+    if 'CUSTOM_AUTHENTICATION_HTML' not in config:
+        config['CUSTOM_AUTHENTICATION_HTML'] = DEFAULT_AUTHENTICATION_HTML
+
+    if 'CUSTOM_CALLBACK_PATH' not in config:
+        config['CUSTOM_CALLBACK_PATH'] = DEFAULT_CALLBACK_PATH
+
+    # Load the FQDN from openstack
+    if 'HOSTNAME_OPENSTACK' not in config:
+        try:
+            config['HOSTNAME'] = requests.get(config['HOSTNAME_OPENSTACK']).text
+        except:
+            pass
+
+    # In case openstack fails and hostname is empty, fetch it from the server itself
+    if 'HOSTNAME_OPENSTACK' not in config and 'HOSTNAME' not in config:
+        config['HOSTNAME'] = socket.getfqdn()
+
+    return config
+
+
+def validate_authorization(local_username):
+    """
+    Checks if the given local username's mail matches with the one provided by OIDC authentication service
+    :param local_username: user's local machine username
+    :return: boolean indicating the success of the authorization
+    """
+    if local_username == 'root':
+        path = '/root/.cyclone'
+    else:
+        path = '/home/' + local_username + '/.cyclone'
+
+    # DEBUG
+    # path = '../../.cyclone'
+
+    global oidc_client
+    user_mail = oidc_client.get_user_info()[u'mail']
+    user_email = oidc_client.get_user_info()[u'email']
+    conf_emails = ConfigObj(path)['EMAIL']
+
+    return user_email in conf_emails or user_mail in conf_emails
 
 
 def pam_sm_authenticate(pamh, flags, argv):
+    """
+    pam_python implementation of the pam_sm_authenticate method of PAM modules
+    This function handles and returns the authentication of a PAM module
+    :param pamh: PAM handle from python_pam module
+    :param flags: configuration flags given to the module
+    :param argv: arguments given to the PAM module in pam.d configuration
+    :return: flag indicating the success or error of the authentication
+    """
     try:
-        user = pamh.get_user(None)
-    except pamh.exception, e:
-        return e.pam_result
-    if not user:
-        return pamh.PAM_USER_UNKNOWN
 
-    # start the server and get the credentials
-    pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'Starting the server'))
-    response = start_server(pamh, argv)
+        local_username = get_local_username(pamh)
+        # DEBUG
+        # local_username = 'sturgelose'
+        if local_username == '':
+            return pamh.PAM_USER_UNKNOWN
 
-    # check that the validation is positive
-    if response is None or not response['validation']:
-        return pamh.PAM_ERROR
+        conf = load_config(DEFAULT_GLOBAL_CONFIG_PATH)
+        port = generate_random_port(conf['PORTS'])
+        setup_oidc(conf, port)
+        run_server(port, conf['HOSTNAME'], pamh)
+        validated = validate_authorization(local_username)
 
-    pamh.conversation(pamh.Message(pamh.PAM_TEXT_INFO, 'User has been authenticated in eduGAIN network'))
-
-    # check with whitelist if user is valid
-    return check_whitelist(get_user_data(response['access_token']), user, pamh)
+        if pamh is not None:
+            if validated:
+                return pamh.PAM_SUCCESS
+            else:
+                return pamh.PAM_USER_UNKNOWN
+    except Exception as e:
+        print ('Exception found:', e)
 
 
 def pam_sm_setcred(pamh, flags, argv):
@@ -302,3 +391,7 @@ def pam_sm_close_session(pamh, flags, argv):
 
 def pam_sm_chauthtok(pamh, flags, argv):
     return pamh.PAM_SUCCESS
+
+
+if __name__ == "__main__":
+    pam_sm_authenticate(None, None, None)
