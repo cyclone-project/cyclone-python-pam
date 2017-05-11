@@ -1,8 +1,11 @@
 # PAM configuration for the Secure Shell service
 
 # Standard Un*x authentication.
+# Default configuration (comment any pam_python.so file to revert to stock settings)
 # @include common-auth
-auth    required    pam_python.so /usr/local/bin/cyclone_pam.py /etc/cyclone/cyclone.conf
+# Use following file to change default configuration location
+# auth    required    pam_python.so /usr/local/bin/cyclone_pam.py /etc/cyclone/cyclone.conf
+auth    required    pam_python.so /usr/local/bin/cyclone_pam.py
 session optional    pam_python.so /usr/local/bin/cyclone_pam.py
 
 # Disallow non-root logins when /etc/nologin exists.

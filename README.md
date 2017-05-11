@@ -112,8 +112,8 @@ to define which ports can the service use.
 To do so, edit the `/etc/cyclone/cyclone.conf` file to add your ports. 
 Add single values for specific ports and a sub array with two values from min to max for ranges.
 
-Then finally enable to load this configuration from the file changing the proper line in `/etc/pam.d/ssh` so it loads 
-this configuration as an argument to the CYCLONE-PAM module.
+The configuration is loaded by default from `/etc/cyclone/cyclone.conf`, but another location can be loaded by providing
+an argument to the PAM library in `/etc/pam.d/sshd` (there is a comment there explaining the procedure).
 
 ## References
 
