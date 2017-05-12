@@ -315,7 +315,7 @@ def load_config(global_config_path):
         config['CUSTOM_CALLBACK_PATH'] = DEFAULT_CALLBACK_PATH
 
     # Load the FQDN from openstack
-    if 'HOSTNAME_OPENSTACK' in config:
+    if 'HOSTNAME' not in config:
         try:
             config['HOSTNAME'] = requests.get(config['HOSTNAME_OPENSTACK']).text
         except Exception as e:
