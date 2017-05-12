@@ -315,11 +315,12 @@ def load_config(global_config_path):
         config['CUSTOM_CALLBACK_PATH'] = DEFAULT_CALLBACK_PATH
 
     # Load the FQDN from openstack
-    if 'HOSTNAME_OPENSTACK' not in config:
+    if 'HOSTNAME_OPENSTACK' in config:
         try:
             config['HOSTNAME'] = requests.get(config['HOSTNAME_OPENSTACK']).text
-        except:
-            pass
+        except Exception as e:
+            log(e.message)
+
 
     # In case openstack fails and hostname is empty, fetch it from the server itself
     if 'HOSTNAME' not in config:
@@ -351,7 +352,7 @@ def validate_authorization(local_username):
 
 
 def log(log_info):
-    log_file = open(DEFAULT_LOG_PATH, 'w')
+    log_file = open(DEFAULT_LOG_PATH, 'a')
     log_file.writelines(log_info + '\n')
     log_file.close()
 
