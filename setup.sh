@@ -7,7 +7,7 @@ apt-get install python-dev python-pip libpam-python git -y
 
 # Clone and install python package dependencies
 cd /tmp
-git clone https://github.com/cyclone-project/cyclone-python-pam.git . && cd cyclone-python-pam
+git clone https://github.com/cyclone-project/cyclone-python-pam.git && cd cyclone-python-pam
 git checkout V2
 pip install -r requirements.pip
 
