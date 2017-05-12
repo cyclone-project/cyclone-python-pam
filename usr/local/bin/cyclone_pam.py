@@ -25,6 +25,7 @@ DEFAULT_AUTHENTICATION_HTML = '/etc/cyclone/authenticated.html'
 DEFAULT_LOG_PATH = '/var/log/cyclone.log'
 # DEBUG
 # DEFAULT_GLOBAL_CONFIG_PATH = '../../../etc/cyclone/cyclone.conf'
+# DEFAULT_LOG_PATH = './cyclone.log'
 
 
 class CycloneOIDC:
@@ -257,12 +258,19 @@ def generate_random_port(conf_ports):
     :return: an available port number
     """
     ports = []
-    for item in conf_ports:
-        items = item.split('-')
+    if isinstance(conf_ports, (list, tuple)):
+        for item in conf_ports:
+            items = item.split('-')
+            if len(items) == 2:
+                ports = ports + range(int(items[0]), int(items[1]))
+            elif len(items) == 1:
+                ports.append(int(item))
+    else:
+        items = conf_ports.split('-')
         if len(items) == 2:
             ports = ports + range(int(items[0]), int(items[1]))
         elif len(items) == 1:
-            ports.append(item)
+            ports.append(int(conf_ports))
 
     chosen_port = random.choice(ports)
 
@@ -314,7 +322,7 @@ def load_config(global_config_path):
             pass
 
     # In case openstack fails and hostname is empty, fetch it from the server itself
-    if 'HOSTNAME_OPENSTACK' not in config and 'HOSTNAME' not in config:
+    if 'HOSTNAME' not in config:
         config['HOSTNAME'] = socket.getfqdn()
 
     return config
