@@ -9,13 +9,12 @@ apt-get install python-dev python-pip libpam-python git -y
 cd ~
 mkdir cyclone-pam && cd cyclone-pam
 git clone https://github.com/cyclone-project/cyclone-python-pam.git .
+git checkout V2
 pip install -r requirements.pip
 
 # Install python script and config
 cp usr/local/bin/cyclone_pam.py /usr/local/bin/cyclone_pam.py
-mkdir /etc/cyclone
-cp etc/cyclone/cyclone.conf /etc/cyclone/cyclone.conf
-cp etc/cyclone/key.pem /etc/cyclone/key.pem
+cp --parents etc/cyclone/* /
 
 # Update ssh PAM config
 cp etc/pam.d/sshd /etc/pam.d/sshd
