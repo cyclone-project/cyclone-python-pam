@@ -22,6 +22,7 @@ DEFAULT_GLOBAL_CONFIG_PATH = '/etc/cyclone/cyclone.conf'
 DEFAULT_CALLBACK_PATH = 'auth/oidc'
 DEFAULT_PORTS = ['8080', '8081', '5000-6000']
 DEFAULT_AUTHENTICATION_HTML = '/etc/cyclone/authenticated.html'
+DEFAULT_LOG_PATH = '/var/log/cyclone.log'
 # DEBUG
 # DEFAULT_GLOBAL_CONFIG_PATH = '../../../etc/cyclone/cyclone.conf'
 
@@ -341,6 +342,12 @@ def validate_authorization(local_username):
     return user_email in conf_emails or user_mail in conf_emails
 
 
+def log(log_info):
+    log_file = open(DEFAULT_LOG_PATH, 'w')
+    log_file.writelines(log_info + '\n')
+    log_file.close()
+
+
 def pam_sm_authenticate(pamh, flags, argv):
     """
     pam_python implementation of the pam_sm_authenticate method of PAM modules
@@ -371,6 +378,7 @@ def pam_sm_authenticate(pamh, flags, argv):
                 return pamh.PAM_USER_UNKNOWN
     except Exception as e:
         print ('Exception found:', e)
+        log(str(e))
 
 
 def pam_sm_setcred(pamh, flags, argv):
