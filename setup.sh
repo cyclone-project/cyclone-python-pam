@@ -36,12 +36,13 @@ cp usr/local/bin/cyclone_pam.py /usr/local/bin/cyclone_pam.py
 mkdir /etc/cyclone/
 cp etc/cyclone/cyclone.conf /etc/cyclone/cyclone.conf
 cp etc/cyclone/authenticated.html /etc/cyclone/authenticated.html
-if [!${isFedora}]; then
-  cp etc/pam.d/sshd-ubuntu /etc/pam.d/sshd
-  cp etc/ssh/sshd_config-ubuntu /etc/ssh/sshd_config
-else
+if [${isFedora}]; then
   cp etc/pam.d/sshd-centos /etc/pam.d/sshd
   cp etc/ssh/sshd_config-centos /etc/ssh/sshd_config
+else
+  cp etc/pam.d/sshd-ubuntu /etc/pam.d/sshd
+  cp etc/ssh/sshd_config-ubuntu /etc/ssh/sshd_config
+
 fi
 service sshd restart
 
@@ -51,7 +52,7 @@ service sshd restart
 ##################
 # Install only if we have the XPRA_INSTALL ENV variable set
 if [ -z "$XPRA_INSTALL" ]; then
-    if [!${isFedora}]; then
+    if [${isFedora} == "false"]; then
       # Install xPra latest version from WinSwitch repo
       curl http://winswitch.org/gpg.asc | apt-key add -
       echo "deb http://winswitch.org/ xenial main" > /etc/apt/sources.list.d/winswitch.list
