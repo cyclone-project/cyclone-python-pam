@@ -2,12 +2,12 @@
 
 /usr/bin/rpm -q -f /usr/bin/rpm > /dev/null 2> /dev/null
 if [ $? -eq 0 ]; then
-  isFedora=true
+  isFedora=0
   package="yum"
   dev="devel"
   ${package} install epel-release -y
 else
-  isFedora=false
+  isFedora=1
   package="apt-get"
   dev="dev"
 fi
@@ -36,7 +36,7 @@ cp usr/local/bin/cyclone_pam.py /usr/local/bin/cyclone_pam.py
 mkdir /etc/cyclone/
 cp etc/cyclone/cyclone.conf /etc/cyclone/cyclone.conf
 cp etc/cyclone/authenticated.html /etc/cyclone/authenticated.html
-if [${isFedora}]; then
+if [ ${isFedora} ]; then
   cp etc/pam.d/sshd-centos /etc/pam.d/sshd
   cp etc/ssh/sshd_config-centos /etc/ssh/sshd_config
 else
@@ -52,7 +52,7 @@ service sshd restart
 ##################
 # Install only if we have the XPRA_INSTALL ENV variable set
 if [ -z "$XPRA_INSTALL" ]; then
-    if [${isFedora} == "false"]; then
+    if [ ! ${isFedora} ]; then
       # Install xPra latest version from WinSwitch repo
       curl http://winswitch.org/gpg.asc | apt-key add -
       echo "deb http://winswitch.org/ xenial main" > /etc/apt/sources.list.d/winswitch.list
