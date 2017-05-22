@@ -39,6 +39,7 @@ cp etc/cyclone/authenticated.html /etc/cyclone/authenticated.html
 if [ ${isFedora} ]; then
   cp etc/pam.d/sshd-centos /etc/pam.d/sshd
   cp etc/ssh/sshd_config-centos /etc/ssh/sshd_config
+  cp lib64/security/pam_python-centos.so lib64/security/pam_python.so
 else
   cp etc/pam.d/sshd-ubuntu /etc/pam.d/sshd
   cp etc/ssh/sshd_config-ubuntu /etc/ssh/sshd_config
