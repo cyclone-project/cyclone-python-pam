@@ -23,7 +23,7 @@ service ssh restart
 ## INSTALL XPRA
 
 # Install only if we have the XPRA_INSTALL ENV variable
-if [ -z "$XPRA_INSTALL" ]; then
+if [ ! -z "$XPRA_INSTALL" ]; then
     # Install xPra latest version from WinSwitch repo
     curl http://winswitch.org/gpg.asc | apt-key add -
     echo "deb http://winswitch.org/ xenial main" > /etc/apt/sources.list.d/winswitch.list
