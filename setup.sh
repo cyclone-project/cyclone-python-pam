@@ -24,6 +24,7 @@ service ssh restart
 
 # Install only if we have the XPRA_INSTALL ENV variable
 if [ ! -z "$XPRA_INSTALL" ]; then
+    chmod a+x setup-xpra.sh
     ./setup-xpra.sh
 fi
 
