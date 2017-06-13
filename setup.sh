@@ -14,7 +14,7 @@ fi
 
 # Install pip
 # Install all required libraries (for both Debian and RHEL systems)
-${package} update
+${package} update -y
 ${package} install -y \
           python-${dev} \
           python-pip \
