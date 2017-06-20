@@ -40,6 +40,11 @@ if [ ${isFedora} ]; then
     cp etc/pam.d/sshd-centos /etc/pam.d/sshd
     cp etc/ssh/sshd_config-centos /etc/ssh/sshd_config
     cp usr/lib64/security/pam_python-centos.so /usr/lib64/security/pam_python.so
+
+    # Setup entrypoint to open needed ports on start
+    cp etc/entrypoint/entrypoint-centos-default.sh /etc/entrypoint.sh
+    chmod +x /etc/entrypoint.sh
+    echo "/etc/entrypoint.sh" >> /etc/rc.local
 else
     cp etc/pam.d/sshd-ubuntu /etc/pam.d/sshd
     cp etc/ssh/sshd_config-ubuntu /etc/ssh/sshd_config
@@ -66,16 +71,22 @@ if [ ! -z "$XPRA_INSTALL" ]; then
         # TODO make it possible to change the window manager
         ${package} install -y xfce4
 
-        # Start xPra at start and execute it now (need to update to use random local internal port!)
-        cp etc/rc.local /etc/rc.local
-        chmod +x /etc/rc.local
+        # Setup entrypoint for xPra
+        cp etc/entrypoint/entrypoint-ubuntu-xpra.sh /etc/entrypoint-xpra.sh
+        chmod +x /etc/entrypoint-xpra.sh
+        echo "/etc/entrypoint-xpra.sh" >> /etc/rc.local
     else
         # Install xPra for RHEL systems
         rpm --import https://winswitch.org/gpg.asc
         cd /etc/yum.repos.d/
         yum install -y curl
         curl -O https://winswitch.org/downloads/CentOS/winswitch.repo
-        yum install xpra
+        yum install -y xpra
+
+        # Setup entrypoint for xPra
+        cp etc/entrypoint/entrypoint-centos-xpra.sh /etc/entrypoint-xpra.sh
+        chmod +x /etc/entrypoint-xpra.sh
+        echo "/etc/entrypoint-xpra.sh" >> /etc/rc.local
     fi
 fi
 
