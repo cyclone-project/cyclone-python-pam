@@ -321,7 +321,6 @@ def load_config(global_config_path):
         except Exception as e:
             log(e.message)
 
-
     # In case openstack fails and hostname is empty, fetch it from the server itself
     if 'HOSTNAME' not in config:
         config['HOSTNAME'] = socket.getfqdn()
@@ -353,7 +352,7 @@ def validate_authorization(local_username):
 
 def log(log_info):
     log_file = open(DEFAULT_LOG_PATH, 'a')
-    log_file.writelines(log_info + '\n')
+    log_file.writelines(str(log_info) + '\n')
     log_file.close()
 
 

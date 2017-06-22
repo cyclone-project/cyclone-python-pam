@@ -45,6 +45,11 @@ if [ ${isFedora} ]; then
     cp etc/entrypoint/entrypoint-centos-default.sh /etc/entrypoint.sh
     chmod +x /etc/entrypoint.sh
     echo "/etc/entrypoint.sh" >> /etc/rc.local
+
+    # Give permissions to write logs in '/var/log/cyclone.log'
+    touch /var/log/cyclone.log
+    semanage fcontext -a -t ssh_home_t '/var/log/cyclone.log'
+    restorecon -R /var/log
 else
     cp etc/pam.d/sshd-ubuntu /etc/pam.d/sshd
     cp etc/ssh/sshd_config-ubuntu /etc/ssh/sshd_config
