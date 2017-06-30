@@ -41,6 +41,9 @@ if [ ${isFedora} ]; then
     cp etc/ssh/sshd_config-centos /etc/ssh/sshd_config
     cp usr/lib64/security/pam_python-centos.so /usr/lib64/security/pam_python.so
 
+    # Start firewalld
+    service firewalld restart
+
     # Setup entrypoint to open needed ports on start
     cp etc/entrypoint/entrypoint-centos-default.sh /etc/entrypoint.sh
     chmod +x /etc/entrypoint.sh
